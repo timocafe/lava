@@ -1,0 +1,14 @@
+#pragma once
+
+#include <string>
+// DO NOT EDIT PREPROCESS FILE
+namespace lava {
+/** Helper to obtain the path of the source directory */
+struct helper_build_path {
+  const std::string static root_path() { return "@PROJECT_SOURCE_DIR@/"; }
+  const std::string static model_path() {
+    return "@PROJECT_SOURCE_DIR@/model/";
+  }
+  const std::string static data_path() { return "@PROJECT_SOURCE_DIR@/data/"; }
+};
+} // namespace lava
