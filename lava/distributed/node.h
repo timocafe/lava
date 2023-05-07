@@ -19,8 +19,8 @@
 // ONNX
 #include <onnxruntime_cxx_api.h>
 // TBB
-#include "tbb/concurrent_queue.h"
-#include "tbb/pipeline.h"
+#include "oneapi/tbb/concurrent_queue.h"
+#include "oneapi/tbb/parallel_pipeline.h"
 // ME
 #include "lava/distributed/message.h"
 #include "lava/utils/utils.h"
@@ -30,6 +30,8 @@ namespace lava {
 struct helper_onnx {
   helper_onnx(const std::string &model = std::string(),
               const std::size_t threads = 1) {
+    if (!std::filesystem::exists(model))
+      throw std::runtime_error("ml model does not exist \n");
     memory_info_ = Ort::MemoryInfo::CreateCpu(
         OrtAllocatorType::OrtArenaAllocator, OrtMemType::OrtMemTypeDefault);
     session_options_ = Ort::SessionOptions();
@@ -52,21 +54,22 @@ struct generator {
     int deviceID = 0;        // 0 = open default camera
     int apiID = cv::CAP_ANY; // 0 = autodetect default API
     // open selected camera using selected API
-    capi_.open(deviceID, apiID);
-    if (!cap.isOpened())
+    cap_.open(deviceID, apiID);
+    if (!cap_.isOpened())
       throw std::runtime_error("Error! Unable to open camera.\n");
   }
 
-  std::string operator()(tbb::flow_control &fc) {
-    std::vector while (!qname_.empty()) {
-      std::string name;
-      if (qname_.try_pop(name)) {
-        return name;
-      }
+  message<uint8_t> operator()(tbb::flow_control &fc) {
+    message<uint8_t> m;
+    m.data().reserve(1080 * 1920);
+    auto data = m.data();
+    cv::Mat frame(data);
+    if (cap_.read(frame)) {
+      return std::move(m);
+    } else {
+      fc.stop();
+      return message<uint8_t>();
     }
-
-    fc.stop();
-    return std::string();
   }
 
   tbb::concurrent_queue<std::string> qname_;
@@ -81,14 +84,10 @@ struct show {
 struct ml {
   explicit ml(const std::string &model_path = std::string(),
               const std::size_t threads = 1)
-      : model_path_(model_path), threads_(threads) {
-    if (std::filesystem::exists(model_path_))
-      ho_ = ho_(model, threads);
-    else
-      throw std::runtime_error("ml model does not exist \n");
-  }
+      : model_path_(model_path), ho_(model_path), threads_(threads) {}
 
-  message<uint8_t> operator()(const message<int32_t> &image) {
+  message<uint8_t> operator()(const message<uint8_t> &image) {
+    message<uint8_t> m2;
     auto &memory_info = ho_.memory_info_;
     auto &session = ho_.session_;
     auto input_shape =
@@ -111,10 +110,12 @@ struct ml {
 
     // session.Run(Ort::RunOptions{nullptr}, input_names, &input_tensor_, 1,
     //             output_names, &output_tensor_, 1);
+    return std::move(m2);
   }
 
   std::filesystem::path model_path_ = std::filesystem::path();
   helper_onnx ho_;
+  std::size_t threads_;
 };
 
 } // namespace lava

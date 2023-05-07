@@ -13,11 +13,11 @@ find_package(PkgConfig REQUIRED)
 
 find_package(TBB REQUIRED)
 find_package(OpenCV REQUIRED)
-find_package(GTest REQUIRED)
-find_package(OpenSSL REQUIRED)
+find_package(OpenSSL 3.0.8)
 
 pkg_check_modules(opencv REQUIRED IMPORTED_TARGET opencv4)
-pkg_check_modules(openssl REQUIRED IMPORTED_TARGET openssl)
+pkg_check_modules(onnxruntime REQUIRED IMPORTED_TARGET libonnxruntime)
+pkg_check_modules(tbb REQUIRED IMPORTED_TARGET tbb)
 
 add_subdirectory(lava)
 add_subdirectory(sandbox)

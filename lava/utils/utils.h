@@ -12,7 +12,7 @@
 #include <iostream>
 #include <sstream>
 
-#include <openssl/sha.h>
+#include "lava/sha256/sha256.h"
 
 namespace lava {
 
@@ -35,22 +35,12 @@ struct tiny_timer {
   std::string name_;
 };
 
-// hex array to string readable
-inline std::string
-sha256_to_str(const std::array<uint8_t, SHA256_DIGEST_LENGTH> array) {
-  std::stringstream ss;
-  ss << std::hex;
-  for (int i = 0; i < array.size(); ++i)
-    ss << std::setw(2) << std::setfill('0') << (int)array[i];
-  return ss.str();
-}
-
 // compute the sha256 from the image
 inline std::string make_sha256(const std::vector<uint8_t> &v,
                                const std::string &model) {
-  std::array<unsigned char, SHA256_DIGEST_LENGTH> sha256;
-  SHA256(v.data(), v.size(), (unsigned char *)sha256.data());
-  return sha256_to_str(sha256);
+  std::string hash_hex_str;
+  picosha2::hash256_hex_string(v, hash_hex_str);
+  return hash_hex_str;
 }
 
 } // namespace lava
