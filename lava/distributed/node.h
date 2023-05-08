@@ -22,7 +22,6 @@
 #include "oneapi/tbb/concurrent_queue.h"
 #include "oneapi/tbb/parallel_pipeline.h"
 // ME
-#include "lava/distributed/message.h"
 #include "lava/utils/utils.h"
 
 namespace lava {
@@ -59,26 +58,42 @@ struct generator {
       throw std::runtime_error("Error! Unable to open camera.\n");
   }
 
-  message<uint8_t> operator()(tbb::flow_control &fc) {
-    message<uint8_t> m;
-    m.data().reserve(1080 * 1920);
-    auto data = m.data();
-    cv::Mat frame(data);
+  cv::Mat operator()(tbb::flow_control &fc) {
+    cv::Mat frame;
     if (cap_.read(frame)) {
-      return std::move(m);
+      return std::move(frame);
     } else {
       fc.stop();
-      return message<uint8_t>();
+      return cv::Mat();
     }
   }
 
-  tbb::concurrent_queue<std::string> qname_;
   cv::VideoCapture cap_;
 };
 
-struct show {
-  // using auto because the type is insane ...
-  void operator()(const message<uint8_t> &m) {}
+struct chat {
+  chat(
+      const std::shared_ptr<oneapi::tbb::concurrent_bounded_queue<cv::Mat>> &q =
+          std::shared_ptr<oneapi::tbb::concurrent_bounded_queue<cv::Mat>>())
+      : q_(q) {}
+  void operator()(const cv::Mat &image) {
+    std::string sha = picosha2::hash256_hex_string(image.begin<uint8_t>(),
+                                                   image.end<uint8_t>());
+    cv::Mat frame;
+    frame = image;
+    write_text(frame, sha);
+    q_->try_push(frame);
+  }
+  void write_text(cv::Mat &image, const std::string &sha) {
+    cv::Point text_position(300, 80);     // Declaring the text position
+    int font_size = 1;                    // Declaring the font size
+    cv::Scalar font_Color(255, 255, 255); // Declaring the color of the font
+    int font_weight = 2;                  // Declaring the font weight
+    cv::putText(image, sha, text_position, cv::FONT_HERSHEY_COMPLEX, font_size,
+                font_Color, font_weight);
+  }
+
+  std::shared_ptr<oneapi::tbb::concurrent_bounded_queue<cv::Mat>> q_;
 };
 
 struct ml {
@@ -86,8 +101,7 @@ struct ml {
               const std::size_t threads = 1)
       : model_path_(model_path), ho_(model_path), threads_(threads) {}
 
-  message<uint8_t> operator()(const message<uint8_t> &image) {
-    message<uint8_t> m2;
+  cv::Mat operator()(const cv::Mat &image) {
     auto &memory_info = ho_.memory_info_;
     auto &session = ho_.session_;
     auto input_shape =
@@ -97,7 +111,6 @@ struct ml {
 
     const auto size_input = input_shape[0] * input_shape[1];
     const auto size_output = output_shape[0] * output_shape[1];
-
     // Ort::Value input_tensor_ =
     //     Ort::Value::CreateTensor<float>(memory_info, x_data, size_input,
     //                                     input_shape.data(),
@@ -110,7 +123,7 @@ struct ml {
 
     // session.Run(Ort::RunOptions{nullptr}, input_names, &input_tensor_, 1,
     //             output_names, &output_tensor_, 1);
-    return std::move(m2);
+    return std::move(image);
   }
 
   std::filesystem::path model_path_ = std::filesystem::path();

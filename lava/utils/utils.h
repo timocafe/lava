@@ -35,12 +35,4 @@ struct tiny_timer {
   std::string name_;
 };
 
-// compute the sha256 from the image
-inline std::string make_sha256(const std::vector<uint8_t> &v,
-                               const std::string &model) {
-  std::string hash_hex_str;
-  picosha2::hash256_hex_string(v, hash_hex_str);
-  return hash_hex_str;
-}
-
 } // namespace lava

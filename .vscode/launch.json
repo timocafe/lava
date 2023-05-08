@@ -8,7 +8,7 @@
             "type": "lldb",
             "request": "launch",
             "name": "Debug",
-            "program": "${workspaceFolder}/build/sandbox/lava",
+            "program": "${workspaceFolder}/build/sandbox/exe",
             "args": [],
             "cwd": "${workspaceFolder}"
         }

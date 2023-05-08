@@ -8,8 +8,10 @@
 
 #pragma once
 
+#include <opencv2/opencv.hpp>
 
-#include "oneapi/tbb/parallel_pipeline.h"
+#include <oneapi/tbb/concurrent_queue.h>
+#include <oneapi/tbb/parallel_pipeline.h>
 
 #include "lava/distributed/node.h"
 
@@ -17,7 +19,13 @@ namespace lava {
 
 struct lavadom {
 
-  explicit lavadom(const std::string &model = "lava.onnx") : ml_(ml(model)) {}
+  explicit lavadom(
+      const std::string &model = "lava.onnx",
+      std::shared_ptr<oneapi::tbb::concurrent_bounded_queue<cv::Mat>> q =
+          std::shared_ptr<oneapi::tbb::concurrent_bounded_queue<cv::Mat>>(),
+      std::shared_ptr<oneapi::tbb::concurrent_queue<cv::Mat>> qm =
+          std::shared_ptr<oneapi::tbb::concurrent_queue<cv::Mat>>())
+      : ml_(ml(model)), chat_(q){};
 
   // functor for the pipeline
   void operator()() {
@@ -25,34 +33,29 @@ struct lavadom {
       oneapi::tbb::parallel_pipeline(
           ntokens_,
           // get the images from the camera
-          oneapi::tbb::make_filter<void, message<uint8_t>>(
+          oneapi::tbb::make_filter<void, cv::Mat>(
               oneapi::tbb::filter_mode::parallel,
-              [&](oneapi::tbb::flow_control &fc) -> message<uint8_t> {
+              [&](oneapi::tbb::flow_control &fc) -> cv::Mat {
                 return generator_(fc);
               }) &
               // perform ML model
-              oneapi::tbb::make_filter<message<uint8_t>, message<uint8_t>>(
+              oneapi::tbb::make_filter<cv::Mat, cv::Mat>(
                   oneapi::tbb::filter_mode::parallel,
-                  [&](const message<uint8_t> &m) -> message<uint8_t> {
-                    return ml_(m);
-                  }) &
+                  [&](const cv::Mat &m) -> cv::Mat { return ml_(m); }) &
               // show image with the randomnumber
-              oneapi::tbb::make_filter<message<uint8_t>, void>(
+              oneapi::tbb::make_filter<cv::Mat, void>(
                   oneapi::tbb::filter_mode::parallel,
-                  [&](const message<uint8_t> &m) { return show_(m); }));
+                  [&](const cv::Mat &m) { chat_(m); }));
     } catch (std::out_of_range &e) {
       std::cerr << "ERROR: somthing else" << std::endl;
       throw e;
     }
   }
-  // accessor number of tokens (batchs) for oneapi::tbb
-  inline std::size_t &ntokens() { return ntokens_; }
-  inline const std::size_t &ntokens() const { return ntokens_; }
 
-  std::size_t ntokens_ = {1}; // number of tokens available
+  std::size_t ntokens_ = {2}; // number of tokens available
   generator generator_;
   ml ml_;
-  show show_;
+  chat chat_;
 };
 
 } // namespace lava

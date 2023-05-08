@@ -1,59 +1,34 @@
-#include <iostream>
+#include <thread>
 
 #include "lava/lava.h"
 
+volatile bool done = false; // volatile is enough here. We don't need a mutex
+                            // for this simple flag.
+
 int main(int, char **) {
 
-  char model[] = "lava.onnx";
-  generate(model);
-  std::cout << " hello \n";
-  return 0;
-  // cv::VideoCapture camera;
-  // int device_counts = 0;
-  // while (true)
-  // {
-  //     if (!camera.open(device_counts++))
-  //     {
-  //         break;
-  //     }
-  // }
-  // camera.release();
-  // std::cout << "devices count : " << device_counts - 1 << std::endl;
+  auto q = std::make_shared<oneapi::tbb::concurrent_bounded_queue<cv::Mat>>(
+      oneapi::tbb::concurrent_bounded_queue<cv::Mat>());
 
-  // Mat frame;
-  // //--- INITIALIZE VIDEOCAPTURE
-  // VideoCapture cap;
-  // // open the default camera using default API
-  // // cap.open(0);
-  // // OR advance usage: select any API backend
-  // int deviceID = 0;        // 0 = open default camera
-  // int apiID = cv::CAP_ANY; // 0 = autodetect default API
-  // // open selected camera using selected API
-  // cap.open(deviceID, apiID);
-  // // check if we succeeded
-  // if (!cap.isOpened())
-  // {
-  //     cerr << "ERROR! Unable to open camera\n";
-  //     return -1;
-  // }
-  // //--- GRAB AND WRITE LOOP
-  // cout << "Start grabbing" << endl
-  //      << "Press any key to terminate" << endl;
-  // for (;;)
-  // {
-  //     // wait for a new frame from camera and store it into 'frame'
-  //     cap.read(frame);
-  //     // check if we succeeded
-  //     if (frame.empty())
-  //     {
-  //         cerr << "ERROR! blank frame grabbed\n";
-  //         break;
-  //     }
-  //     // show live and wait for a key with timeout long enough to show
-  //     images imshow("Live", frame); if (waitKey(5) >= 0)
-  //         break;
-  // }
-  // // the camera will be deinitialized automatically in VideoCapture
-  // destructor
+  std::string name("lava.onnx");
+  const auto &model = lava::helper_build_path::model_path() + name;
+  lava::lavadom l(model, q);
+  auto pipelineRunner = std::thread(std::ref(l));
+
+  int counter = 0;
+
+  for (; !done;) {
+    cv::Mat image;
+    if (q->try_pop(image)) {
+      char c = (char)cv::waitKey(1);
+      if (c == 27 || c == 'q' || c == 'Q') {
+        done = true;
+      }
+      cv::imshow("result", image);
+      //    auto name = "image" + std::to_string(counter++) + ".png";
+      //    cv::imwrite(name, image);
+    }
+  }
+  pipelineRunner.join();
   return 0;
 }
