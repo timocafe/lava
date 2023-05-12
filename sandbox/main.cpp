@@ -10,7 +10,7 @@ int main(int, char **) {
   auto q = std::make_shared<oneapi::tbb::concurrent_bounded_queue<cv::Mat>>(
       oneapi::tbb::concurrent_bounded_queue<cv::Mat>());
 
-  std::string name("lava.onnx");
+  std::string name("best.onnx");
   const auto &model = lava::helper_build_path::model_path() + name;
   lava::lavadom l(model, q);
   auto pipelineRunner = std::thread(std::ref(l));

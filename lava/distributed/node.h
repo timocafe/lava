@@ -13,6 +13,7 @@
 #include <cstdlib>
 #include <iostream>
 #include <memory>
+#include <numeric>
 #include <variant>
 // OPenCV
 #include <opencv2/opencv.hpp>
@@ -104,22 +105,47 @@ struct ml {
   cv::Mat operator()(const cv::Mat &image) {
     auto &memory_info = ho_.memory_info_;
     auto &session = ho_.session_;
-    auto input_shape =
-        session.GetInputTypeInfo(0).GetTensorTypeAndShapeInfo().GetShape();
-    auto output_shape =
-        session.GetOutputTypeInfo(0).GetTensorTypeAndShapeInfo().GetShape();
+    Ort::AllocatorWithDefaultOptions allocator;
+    int input_count = session.GetInputCount();
+    int output_count = session.GetOutputCount();
+    std::vector<std::string> input_names(input_count);
+    std::vector<std::string> output_names(output_count);
+    input_names.resize(input_count);
+    output_names.resize(output_count);
+    for (int i = 0; i < input_count; i++)
+      input_names[i] = &*session.GetInputNameAllocated(i, allocator);
 
-    const auto size_input = input_shape[0] * input_shape[1];
-    const auto size_output = output_shape[0] * output_shape[1];
-    // Ort::Value input_tensor_ =
-    //     Ort::Value::CreateTensor<float>(memory_info, x_data, size_input,
-    //                                     input_shape.data(),
-    //                                     input_shape.size());
-    // Ort::Value output_tensor_ = Ort::Value::CreateTensor<float>(
-    //     memory_info, y_data, size_output, output_shape.data(),
-    //     output_shape.size());
-    // const char *input_names[] = {"x"};
-    // const char *output_names[] = {"dense_3"};
+    for (int i = 0; i < output_count; i++)
+      output_names[i] = &*session.GetOutputNameAllocated(i, allocator);
+
+    // auto toto = session.GetInputNames();
+
+    // auto input_shape =
+    //     session.GetInputTypeInfo(0).GetTensorTypeAndShapeInfo().GetShape();
+    // auto output_shape =
+    //     session.GetOutputTypeInfo(0).GetTensorTypeAndShapeInfo().GetShape();
+
+    // const auto size_input =
+    //     std::accumulate(input_shape.begin(), input_shape.end(), 1,
+    //                     [](int a, int b) { return a * b; });
+    // const auto size_output =
+    //     std::accumulate(output_shape.begin(), output_shape.end(), 1,
+    //                     [](int a, int b) { return a * b; });
+
+    // // resize to 640x640 the input
+    // cv::Size new_size(640, 640);
+    // cv::Mat imgRGBFloat;
+    // image.convertTo(imgRGBFloat, CV_32F);
+    // cv::resize(imgRGBFloat, imgRGBFloat, new_size);
+
+    // Ort::Value input_tensor = Ort::Value::CreateTensor<float>(
+    //     memory_info, reinterpret_cast<float *>(imgRGBFloat.data),
+    //     size_input, input_shape.data(), input_shape.size());
+
+    // std::vector<Ort::Value> outputTensors =
+    //     session.Run(Ort::RunOptions{nullptr}, inputNames.data(),
+    //     &input_tensor,
+    //                 1, outputNames.data(), outputNames.size());
 
     // session.Run(Ort::RunOptions{nullptr}, input_names, &input_tensor_, 1,
     //             output_names, &output_tensor_, 1);
