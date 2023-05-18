@@ -20,8 +20,9 @@
 // ONNX
 #include <onnxruntime_cxx_api.h>
 // TBB
+#include "oneapi/tbb/blocked_range.h"
 #include "oneapi/tbb/concurrent_queue.h"
-#include "oneapi/tbb/parallel_pipeline.h"
+#include "oneapi/tbb/parallel_for.h"
 // MIAOU
 #include "lava/sha256/sha256.h"
 
@@ -143,28 +144,13 @@ cv::Mat make_input_image(const cv::Mat &image) {
 struct Detection {
   float confidence;
   cv::Rect box;
+  uint64_t sha_ = 0;
 };
 
-void getBestClassInfo(const cv::Mat &p_Mat, const int &numClasses,
-                      float &bestConf, int &bestClassId) {
-  bestClassId = 0;
-  bestConf = 0;
-
-  if (p_Mat.rows && p_Mat.cols) {
-    for (int i = 0; i < numClasses; i++) {
-      if (p_Mat.at<float>(0, i + 4) > bestConf) {
-        bestConf = p_Mat.at<float>(0, i + 4);
-        bestClassId = i;
-      }
-    }
-  }
-}
-
 void detect(const cv::Mat &input_image, Ort::Value &output_tensor,
-            std::vector<Detection> &output) {
-
-  std::vector<float> confidences;
-  std::vector<cv::Rect> boxes;
+            std::vector<Detection> &output, std::vector<float> &confidences,
+            std::vector<cv::Rect> &boxes) {
+  // model trains with 640,640 inputs
   float x_factor = input_image.cols / 640.;
   float y_factor = input_image.rows / 640.;
 
@@ -172,7 +158,8 @@ void detect(const cv::Mat &input_image, Ort::Value &output_tensor,
   std::vector<int64_t> outputShape =
       output_tensor.GetTensorTypeAndShapeInfo().GetShape();
   size_t count = output_tensor.GetTensorTypeAndShapeInfo().GetElementCount();
-
+  // OpenCV is a pain with coordinates which are != from usual (x,y) orthogonal
+  // basis
   cv::Mat l_Mat =
       cv::Mat(outputShape[1], outputShape[2], CV_32FC1, (void *)data);
   cv::Mat l_Mat_t = l_Mat.t();
@@ -181,10 +168,7 @@ void detect(const cv::Mat &input_image, Ort::Value &output_tensor,
 
   for (int l_Row = 0; l_Row < l_Mat_t.rows; l_Row++) {
     cv::Mat l_MatRow = l_Mat_t.row(l_Row);
-    float objConf;
-    int classId;
-
-    getBestClassInfo(l_MatRow, numClasses, objConf, classId);
+    const float objConf = l_MatRow.at<float>(0, 4);
 
     if (objConf > 0.4) {
       confidences.push_back(objConf);
@@ -200,7 +184,6 @@ void detect(const cv::Mat &input_image, Ort::Value &output_tensor,
     }
   }
 
-  std::vector<int> class_ids;
   const float SCORE_THRESHOLD = 0.2;
   const float NMS_THRESHOLD = 0.4;
   const float CONFIDENCE_THRESHOLD = 0.4;
@@ -210,10 +193,7 @@ void detect(const cv::Mat &input_image, Ort::Value &output_tensor,
                     nms_result);
   for (int i = 0; i < nms_result.size(); i++) {
     int idx = nms_result[i];
-    Detection result;
-    result.confidence = confidences[idx];
-    result.box = boxes[idx];
-    output.push_back(result);
+    output.push_back({confidences[idx], boxes[idx]});
   }
 }
 
@@ -224,16 +204,52 @@ uint64_t chat_to_int(const std::string &chat) {
   return num;
 }
 
+void compute_sha_buble(const cv::Mat &image,
+                       std::vector<Detection> &detections) {
+  tbb::parallel_for(
+      tbb::blocked_range<int>(0, detections.size()),
+      [&](tbb::blocked_range<int> r) {
+        for (int i = r.begin(); i < r.end(); ++i) {
+          auto &detection = detections[i];
+          auto box = detection.box;
+          cv::Mat sub_image = image(cv::Range(box.y, box.y + box.height),
+                                    cv::Range(box.x, box.x + box.width));
+          std::string sha = picosha2::hash256_hex_string(
+              sub_image.begin<uint8_t>(), sub_image.end<uint8_t>());
+          std::string ssha = sha.substr(1, 8);
+          detection.sha_ = chat_to_int(ssha);
+        }
+      });
+}
+
+void mark_image(const cv::Mat &image,
+                const std::vector<Detection> &detections) {
+  for (const auto &detection : detections) {
+    auto box = detection.box;
+    const auto color = cv::Scalar(0, 255, 0);
+    cv::rectangle(image, box, color, 3);
+    cv::rectangle(image, cv::Point(box.x, box.y - 20),
+                  cv::Point(box.x + box.width, box.y), color, cv::FILLED);
+    cv::putText(image, std::to_string(detection.sha_),
+                cv::Point(box.x, box.y - 5), cv::FONT_HERSHEY_SIMPLEX, 0.5,
+                cv::Scalar(0, 0, 0));
+  }
+}
+
 struct ml {
   explicit ml(const std::string &model_path = std::string(),
               const std::size_t threads = 1)
-      : model_path_(model_path), ho_(model_path), threads_(threads) {}
+      : model_path_(model_path), ho_(model_path), threads_(threads) {
+    detections_.reserve(32);
+    confidences_.reserve(32);
+    boxes_.reserve(32);
+  }
 
   cv::Mat operator()(const cv::Mat &image) {
     auto &memory_info = ho_.memory_info_;
     auto &session = ho_.session_;
-    const auto &cinput_name = cnames(ho_.input_name_);
-    const auto &coutput_name = cnames(ho_.output_name_);
+    cinput_name_ = cnames(ho_.input_name_);
+    coutput_name_ = cnames(ho_.output_name_);
 
     auto input_shape =
         session.GetInputTypeInfo(0).GetTensorTypeAndShapeInfo().GetShape();
@@ -248,36 +264,28 @@ struct ml {
         memory_info, reinterpret_cast<float *>(nimage.data), input_size,
         input_shape.data(), input_shape.size());
 
-    auto output = session.Run(Ort::RunOptions{nullptr}, cinput_name.data(),
-                              &input_tensor, cinput_name.size(),
-                              coutput_name.data(), coutput_name.size());
+    auto output = session.Run(Ort::RunOptions{nullptr}, cinput_name_.data(),
+                              &input_tensor, cinput_name_.size(),
+                              coutput_name_.data(), coutput_name_.size());
 
     auto &output_tensor = output.front();
-    std::vector<Detection> detections;
-    detect(image, output_tensor, detections);
-
-    for (const auto &detection : detections) {
-      auto box = detection.box;
-      const auto color = cv::Scalar(0, 255, 0);
-      cv::rectangle(image, box, color, 3);
-
-      cv::Mat sub_image = image(cv::Range(box.y, box.y + box.height),
-                                cv::Range(box.x, box.x + box.width));
-      std::string sha = picosha2::hash256_hex_string(sub_image.begin<uint8_t>(),
-                                                     sub_image.end<uint8_t>());
-      std::string ssha = sha.substr(1, 8);
-
-      int64_t num = chat_to_int(ssha);
-
-      cv::rectangle(image, cv::Point(box.x, box.y - 20),
-                    cv::Point(box.x + box.width, box.y), color, cv::FILLED);
-      cv::putText(image, std::to_string(num), cv::Point(box.x, box.y - 5),
-                  cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(0, 0, 0));
-    }
-
+    // detect the bubbles
+    detect(image, output_tensor, detections_, confidences_, boxes_);
+    // compute every sha
+    compute_sha_buble(image, detections_);
+    // mark the original image with rectangle
+    mark_image(image, detections_);
+    detections_.clear();
+    confidences_.clear();
+    boxes_.clear();
     return std::move(image);
   }
 
+  std::vector<const char *> cinput_name_;
+  std::vector<const char *> coutput_name_;
+  std::vector<float> confidences_;
+  std::vector<cv::Rect> boxes_;
+  std::vector<Detection> detections_;
   std::filesystem::path model_path_ = std::filesystem::path();
   helper_onnx ho_;
   std::size_t threads_;
