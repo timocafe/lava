@@ -22,14 +22,14 @@
 // TBB
 #include "oneapi/tbb/concurrent_queue.h"
 #include "oneapi/tbb/parallel_pipeline.h"
-// ME
-#include "lava/utils/utils.h"
+// MIAOU
+#include "lava/sha256/sha256.h"
 
 namespace lava {
 
 std::vector<std::string> get_input_name(const Ort::Session &session) {
   Ort::AllocatorWithDefaultOptions allocator;
-  std::size_t  input_count = session.GetInputCount();
+  std::size_t input_count = session.GetInputCount();
   std::vector<std::string> input_names(input_count);
   for (int i = 0; i < input_count; i++)
     input_names[i] = &*session.GetInputNameAllocated(i, allocator);
