@@ -17,16 +17,14 @@ int main(int, char **) {
 
   int counter = 0;
 
+  cv::Mat image;
   for (; !done;) {
-    cv::Mat image;
     if (q->try_pop(image)) {
       char c = (char)cv::waitKey(1);
       if (c == 27 || c == 'q' || c == 'Q') {
         done = true;
       }
       cv::imshow("result", image);
-      //    auto name = "image" + std::to_string(counter++) + ".png";
-      //    cv::imwrite(name, image);
     }
   }
   pipelineRunner.join();
