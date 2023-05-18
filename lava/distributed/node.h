@@ -29,7 +29,7 @@ namespace lava {
 
 std::vector<std::string> get_input_name(const Ort::Session &session) {
   Ort::AllocatorWithDefaultOptions allocator;
-  int input_count = session.GetInputCount();
+  std::size_t  input_count = session.GetInputCount();
   std::vector<std::string> input_names(input_count);
   for (int i = 0; i < input_count; i++)
     input_names[i] = &*session.GetInputNameAllocated(i, allocator);
@@ -39,7 +39,7 @@ std::vector<std::string> get_input_name(const Ort::Session &session) {
 
 std::vector<std::string> get_output_name(const Ort::Session &session) {
   Ort::AllocatorWithDefaultOptions allocator;
-  int output_count = session.GetOutputCount();
+  std::size_t output_count = session.GetOutputCount();
   std::vector<std::string> output_names(output_count);
   for (int i = 0; i < output_count; i++)
     output_names[i] = &*session.GetOutputNameAllocated(i, allocator);
@@ -141,7 +141,6 @@ cv::Mat make_input_image(const cv::Mat &image) {
 }
 
 struct Detection {
-  int class_id;
   float confidence;
   cv::Rect box;
 };
@@ -212,11 +211,17 @@ void detect(const cv::Mat &input_image, Ort::Value &output_tensor,
   for (int i = 0; i < nms_result.size(); i++) {
     int idx = nms_result[i];
     Detection result;
-    result.class_id = 0;
     result.confidence = confidences[idx];
     result.box = boxes[idx];
     output.push_back(result);
   }
+}
+
+uint64_t chat_to_int(const std::string &chat) {
+  uint64_t num = 0;
+  for (int i = 0; i < 8; i++)
+    num = (num << 8) | chat[i];
+  return num;
 }
 
 struct ml {
@@ -253,13 +258,20 @@ struct ml {
 
     for (const auto &detection : detections) {
       auto box = detection.box;
-      auto classId = detection.class_id;
       const auto color = cv::Scalar(0, 255, 0);
       cv::rectangle(image, box, color, 3);
 
+      cv::Mat sub_image = image(cv::Range(box.y, box.y + box.height),
+                                cv::Range(box.x, box.x + box.width));
+      std::string sha = picosha2::hash256_hex_string(sub_image.begin<uint8_t>(),
+                                                     sub_image.end<uint8_t>());
+      std::string ssha = sha.substr(1, 8);
+
+      int64_t num = chat_to_int(ssha);
+
       cv::rectangle(image, cv::Point(box.x, box.y - 20),
                     cv::Point(box.x + box.width, box.y), color, cv::FILLED);
-      cv::putText(image, "buble", cv::Point(box.x, box.y - 5),
+      cv::putText(image, std::to_string(num), cv::Point(box.x, box.y - 5),
                   cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(0, 0, 0));
     }
 

@@ -40,7 +40,7 @@ struct lavadom {
               }) &
               // perform ML model
               oneapi::tbb::make_filter<cv::Mat, cv::Mat>(
-                  oneapi::tbb::filter_mode::parallel,
+                  oneapi::tbb::filter_mode::serial_in_order,
                   [&](const cv::Mat &m) -> cv::Mat { return ml_(m); }) &
               // show image with the randomnumber
               oneapi::tbb::make_filter<cv::Mat, void>(
