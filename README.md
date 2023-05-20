@@ -31,7 +31,8 @@ cmake -DCMAKE_BUILD_TYPE=Release ..
 
 ## Technique - AI
 
-The problem is basic; it consists of detecting the wax. From a movie, I created a basic dataset of 256 images. Then, I prepared the data by marking the wax and performed basic training with YOLOv8 Nano (already pretrained on COCO).
+The problem is basic; it consists of detecting the wax. From a movie, I created a basic dataset of 256 images. Then, I prepared the data by marking the wax 
+and performed basic training with YOLOv8 Nano (already pretrained on COCO). YOLO is a standard for detection, light and very efficient. 
 
 I did all my AI work on the cloud:
 
