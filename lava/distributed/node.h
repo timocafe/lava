@@ -123,7 +123,7 @@ struct chat {
     q_->try_push(frame);
   }
   void write_text(cv::Mat &image, const std::string &sha) {
-    cv::Point text_position(300, 80);     // Declaring the text position
+    cv::Point text_position(200, 80);     // Declaring the text position
     int font_size = 1;                    // Declaring the font size
     cv::Scalar font_Color(255, 255, 255); // Declaring the color of the font
     int font_weight = 2;                  // Declaring the font weight
@@ -144,7 +144,7 @@ cv::Mat make_input_image(const cv::Mat &image) {
 struct Detection {
   float confidence;
   cv::Rect box;
-  uint64_t sha_ = 0;
+  std::string sha_;
 };
 
 void detect(const cv::Mat &input_image, Ort::Value &output_tensor,
@@ -197,13 +197,6 @@ void detect(const cv::Mat &input_image, Ort::Value &output_tensor,
   }
 }
 
-uint64_t chat_to_int(const std::string &chat) {
-  uint64_t num = 0;
-  for (int i = 0; i < 8; i++)
-    num = (num << 8) | chat[i];
-  return num;
-}
-
 void compute_sha_buble(const cv::Mat &image,
                        std::vector<Detection> &detections) {
   tbb::parallel_for(
@@ -212,12 +205,15 @@ void compute_sha_buble(const cv::Mat &image,
         for (int i = r.begin(); i < r.end(); ++i) {
           auto &detection = detections[i];
           auto box = detection.box;
-          cv::Mat sub_image = image(cv::Range(box.y, box.y + box.height),
-                                    cv::Range(box.x, box.x + box.width));
-          std::string sha = picosha2::hash256_hex_string(
-              sub_image.begin<uint8_t>(), sub_image.end<uint8_t>());
-          std::string ssha = sha.substr(1, 8);
-          detection.sha_ = chat_to_int(ssha);
+
+          if (box.x >= 0 && box.y >= 0 && box.width + box.x < image.cols &&
+              box.height + box.y < image.rows) {
+            cv::Mat sub_image = image(cv::Range(box.y, box.y + box.height),
+                                      cv::Range(box.x, box.x + box.width));
+            std::string sha = picosha2::hash256_hex_string(
+                sub_image.begin<uint8_t>(), sub_image.end<uint8_t>());
+            detection.sha_ = sha.substr(1, 8);
+          }
         }
       });
 }
@@ -230,9 +226,8 @@ void mark_image(const cv::Mat &image,
     cv::rectangle(image, box, color, 3);
     cv::rectangle(image, cv::Point(box.x, box.y - 20),
                   cv::Point(box.x + box.width, box.y), color, cv::FILLED);
-    cv::putText(image, std::to_string(detection.sha_),
-                cv::Point(box.x, box.y - 5), cv::FONT_HERSHEY_SIMPLEX, 0.5,
-                cv::Scalar(0, 0, 0));
+    cv::putText(image, detection.sha_, cv::Point(box.x, box.y - 5),
+                cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(0, 0, 0));
   }
 }
 
