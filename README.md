@@ -2,6 +2,8 @@
 
 Random generator from a lava lamp.
 
+<img src="./movie/lavalamp.gif"/>
+
 ## A Bit of Physics
 
 A lava lamp consists of two fluids with different densities, typically a derivative of paraffin for the wax and water for the second fluid. When the lamp is switched on, the light bulb warms up the liquids. The wax (paraffin) expands, and since density is equal to mass divided by volume, when the volume increases, the density of the wax decreases, and it floats, reaching the top of the lamp. The liquid water is cooler, so the volume of the wax decreases, resulting in higher density, causing it to drop.
