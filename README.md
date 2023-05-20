@@ -8,7 +8,7 @@ Random generator from a lava lamp.
 
 A lava lamp consists of two fluids with different densities, typically a derivative of paraffin for the wax and water for the second fluid. When the lamp is switched on, the light bulb warms up the liquids. The wax (paraffin) expands, and since density is equal to mass divided by volume, when the volume increases, the density of the wax decreases, and it floats, reaching the top of the lamp. The liquid water is cooler, so the volume of the wax decreases, resulting in higher density, causing it to drop.
 
-The form of the wax can be psychedelic and belongs to the world of Rayleigh-Taylor instability. The physics behind it is not trivial. It is the same in thermonuclear reactors like a Tokamak (in this case, the fluids are the protons and electrons).
+The form of the wax can be psychedelic and belongs to the world of Rayleigh-Taylor instability (souvenir my master degree). The physics behind it is not trivial. It is the same in thermonuclear reactors like a Tokamak (in this case, the fluids are the protons and electrons).
 
 As the form of the wax is more or less unpredictable and different every time, it becomes a good idea for a random generator. I simply compute the SHA256 of the image.
 
@@ -44,7 +44,7 @@ I did all my AI work on the cloud:
 
 ## Technique - HPC
 
-Intel oneAPI provides amazing tools for performance. Here, the main components are oneAPI/TBB for the pipeline and parallel container, oneAPI/DNN for deep learning, and a decent execution of ONNX. Note that ONNX is really generic, so regardless of your machine, you should select the best backend.
+Intel oneAPI provides amazing tools for performance. Here, the main components are oneAPI/TBB for the pipeline and parallel container, oneAPI/DNN for a decent execution of ONNX. Note that ONNX is really generic, so regardless of your machine, you should select the best backend.
 
 ## Disclamer
 
