@@ -43,3 +43,8 @@ I did all my AI work on the cloud:
 ## Technique - HPC
 
 Intel oneAPI provides amazing tools for performance. Here, the main components are oneAPI/TBB for the pipeline and parallel container, oneAPI/DNN for deep learning, and a decent execution of ONNX. Note that ONNX is really generic, so regardless of your machine, you should select the best backend.
+
+## Disclamer
+
+There is no garantee at all, it is a perfect random generator ! No idea of the SHA256 algo for the randomess. 
+
