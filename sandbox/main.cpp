@@ -15,8 +15,6 @@ int main(int, char **) {
   lava::lavadom l(model, q);
   auto pipelineRunner = std::thread(std::ref(l));
 
-  int counter = 0;
-
   cv::Mat image;
   for (; !done;) {
     if (q->try_pop(image)) {
