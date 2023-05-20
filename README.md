@@ -49,5 +49,5 @@ Intel oneAPI provides amazing tools for performance. Here, the main components a
 
 ## Disclamer
 
-There is no garantee at all, it is a perfect random generator ! No idea of the SHA256 algo for the randomess. 
+There is no garantee at all, it is a perfect random generator ! No idea of the SHA256 algo for the randomness. 
 
