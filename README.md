@@ -49,5 +49,5 @@ Intel oneAPI provides amazing tools for performance. Here, the main components a
 
 ## Disclamer
 
-I did not make a study of the efficiency of the generator, and I have no idea of the SHA256 algo. for the randomness. So no garantee at all of the math. quality. 
+I did not make a study of the efficiency of the generator, and I have no idea of the SHA256 influence for the randomness. So no garantee, at all of the mathematical  quality. 
 
