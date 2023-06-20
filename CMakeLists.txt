@@ -14,7 +14,6 @@ find_package(PkgConfig REQUIRED)
 find_package(TBB REQUIRED)
 find_package(Threads REQUIRED)
 find_package(OpenCV REQUIRED)
-find_package(OpenSSL 3.0.8)
 
 pkg_check_modules(opencv REQUIRED IMPORTED_TARGET opencv4)
 pkg_check_modules(onnxruntime REQUIRED IMPORTED_TARGET libonnxruntime)
