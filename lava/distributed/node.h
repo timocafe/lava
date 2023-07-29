@@ -84,9 +84,12 @@ struct helper_onnx {
     memory_info_ = Ort::MemoryInfo::CreateCpu(
         OrtAllocatorType::OrtArenaAllocator, OrtMemType::OrtMemTypeDefault);
     session_options_ = Ort::SessionOptions();
+    uint32_t coreml_flags = 0;
     session_options_.SetInterOpNumThreads(threads);
     session_options_.SetGraphOptimizationLevel(
         GraphOptimizationLevel::ORT_ENABLE_EXTENDED);
+    // Ort::ThrowOnError(OrtSessionOptionsAppendExecutionProvider_CoreML(
+    //     session_options_, coreml_flags));
     env_ = Ort::Env(ORT_LOGGING_LEVEL_WARNING, "tutu");
     session_ = Ort::Session(env_, model.c_str(), session_options_);
     input_name_ = get_input_name(session_);
@@ -135,7 +138,8 @@ struct chat {
                                                    image.end<uint8_t>());
     cv::Mat frame;
     frame = image;
-    write_text(frame, sha);
+    // write big chat
+    //  write_text(frame, sha);
     q_->try_push(frame);
   }
   void write_text(cv::Mat &image, const std::string &sha) {
@@ -238,7 +242,7 @@ void mark_image(const cv::Mat &image,
                 const std::vector<Detection> &detections) {
   for (const auto &detection : detections) {
     auto box = detection.box;
-    const auto color = cv::Scalar(0, 255, 0);
+    const auto color = cv::Scalar(187, 114, 0); // bgr french blue
     cv::rectangle(image, box, color, 3);
     cv::rectangle(image, cv::Point(box.x, box.y - 20),
                   cv::Point(box.x + box.width, box.y), color, cv::FILLED);
