@@ -18,6 +18,12 @@ The idea is not new and was patented by SGI. Cloudflare uses it daily for the ne
 
 A lava lamp ($30), a USB webcam ($30), and a computer.
 
+## Platform 
+I personnaly tested on the following platforms:
+```
+- Apple M1
+- win11 + wsl (Ubuntu 20) but it necessitates to rebuild the kernel to suport USB webcam https://github.com/timocafe/wsl2_linux_kernel_usbcam_enable_conf
+```
 ## Build
 
 The software needs oneAPI, ONNX, and OpenCV. If the dependencies have been correctly installed and the package is correctly configured, follow these steps:
