@@ -48,19 +48,22 @@ struct lavadom {
       oneapi::tbb::parallel_pipeline(
           ntokens_,
           // get the images from the camera
-          oneapi::tbb::make_filter<void, cv::Mat>(
+          oneapi::tbb::make_filter<void, std::vector<cv::Mat>>(
               oneapi::tbb::filter_mode::serial_in_order,
-              [&](oneapi::tbb::flow_control &fc) -> cv::Mat {
+              [&](oneapi::tbb::flow_control &fc) -> std::vector<cv::Mat> {
                 return generator_(fc);
               }) &
               // perform ML model
-              oneapi::tbb::make_filter<cv::Mat, cv::Mat>(
+              oneapi::tbb::make_filter<std::vector<cv::Mat>,
+                                       std::vector<cv::Mat>>(
                   oneapi::tbb::filter_mode::serial_in_order,
-                  [&](const cv::Mat &m) -> cv::Mat { return ml_(m); }) &
+                  [&](const std::vector<cv::Mat> &m) -> std::vector<cv::Mat> {
+                    return ml_(m);
+                  }) &
               // show image with the randomnumber
-              oneapi::tbb::make_filter<cv::Mat, void>(
+              oneapi::tbb::make_filter<std::vector<cv::Mat>, void>(
                   oneapi::tbb::filter_mode::serial_in_order,
-                  [&](const cv::Mat &m) { chat_(m); }));
+                  [&](const std::vector<cv::Mat> &m) { chat_(m); }));
     } catch (std::out_of_range &e) {
       std::cerr << "ERROR: somthing else" << std::endl;
       throw e;

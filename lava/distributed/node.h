@@ -44,6 +44,12 @@
 
 namespace lava {
 
+struct constant {
+  const static int nimages = 30;
+  const static int model_width = 640;
+  const static int model_high = 640;
+};
+
 std::vector<std::string> get_input_name(const Ort::Session &session) {
   Ort::AllocatorWithDefaultOptions allocator;
   std::size_t input_count = session.GetInputCount();
@@ -115,14 +121,17 @@ struct generator {
       throw std::runtime_error("Error! Unable to open camera.\n");
   }
 
-  cv::Mat operator()(tbb::flow_control &fc) {
+  std::vector<cv::Mat> operator()(tbb::flow_control &fc) {
+    std::vector<cv::Mat> v(constant::nimages);
     cv::Mat frame;
-    if (cap_.read(frame)) {
-      return std::move(frame);
-    } else {
-      fc.stop();
-      return cv::Mat();
+    for (int i = 0; i < constant::nimages; ++i) {
+      if (cap_.read(frame)) {
+        v[i] = frame;
+      } else {
+        fc.stop();
+      }
     }
+    return v;
   }
 
   cv::VideoCapture cap_;
@@ -141,14 +150,13 @@ struct chat {
       const std::shared_ptr<oneapi::tbb::concurrent_bounded_queue<cv::Mat>> &q =
           std::shared_ptr<oneapi::tbb::concurrent_bounded_queue<cv::Mat>>())
       : q_(q) {}
-  void operator()(const cv::Mat &image) {
-    std::string sha = picosha2::hash256_hex_string(image.begin<uint8_t>(),
-                                                   image.end<uint8_t>());
-    cv::Mat frame;
-    frame = image;
-    // write big chat
-    //  write_text(frame, sha);
-    q_->try_push(frame);
+  void operator()(const std::vector<cv::Mat> &images) {
+    // std::string sha = picosha2::hash256_hex_string(image.begin<uint8_t>(),
+    //                                                image.end<uint8_t>());
+    //  write big chat
+    //   write_text(frame, sha);
+    for (auto &image : images)
+      q_->try_push(image);
   }
 
   void write_text(cv::Mat &image, const std::string &sha) {
@@ -159,11 +167,15 @@ struct chat {
   std::shared_ptr<oneapi::tbb::concurrent_bounded_queue<cv::Mat>> q_;
 };
 
-cv::Mat make_input_image(const cv::Mat &image) {
-  auto nimage = image.clone();
-  cv::resize(nimage, nimage, cv::Size(640, 640));
-  return cv::dnn::blobFromImage(nimage, 1. / 255, cv::Size(640, 640),
-                                cv::Scalar(), true, false);
+cv::Mat make_input_image(const std::vector<cv::Mat> &image) {
+  std::vector<cv::Mat> clone(constant::nimages);
+
+  for (int i = 0; i < constant::nimages; ++i) {
+    clone[i] = image[i].clone();
+    cv::resize(clone[i], clone[i], cv::Size(640, 640));
+  }
+  return cv::dnn::blobFromImages(clone, 1. / 255, cv::Size(640, 640),
+                                 cv::Scalar(), true, false);
 }
 
 struct Detection {
@@ -265,40 +277,41 @@ struct ml {
     boxes_.reserve(32);
   }
 
-  cv::Mat operator()(const cv::Mat &image) {
+  std::vector<cv::Mat> operator()(const std::vector<cv::Mat> &images) {
     auto &memory_info = ho_.memory_info_;
     auto &session = ho_.session_;
     cinput_name_ = cnames(ho_.input_name_);
     coutput_name_ = cnames(ho_.output_name_);
 
-    auto input_shape =
-        session.GetInputTypeInfo(0).GetTensorTypeAndShapeInfo().GetShape();
-    auto output_shape =
-        session.GetOutputTypeInfo(0).GetTensorTypeAndShapeInfo().GetShape();
+    std::vector<int64_t> input_shape = {constant::nimages, 3, 640, 640};
 
     const auto input_size = get_size(input_shape);
 
-    const auto &nimage = make_input_image(image);
+    const auto &batch = make_input_image(images);
 
     Ort::Value input_tensor = Ort::Value::CreateTensor<float>(
-        memory_info, reinterpret_cast<float *>(nimage.data), input_size,
+        memory_info, reinterpret_cast<float *>(batch.data), input_size,
         input_shape.data(), input_shape.size());
 
     auto output = session.Run(Ort::RunOptions{nullptr}, cinput_name_.data(),
                               &input_tensor, cinput_name_.size(),
                               coutput_name_.data(), coutput_name_.size());
 
-    auto &output_tensor = output.front();
-    // detect the bubbles
-    detect(image, output_tensor, detections_, confidences_, boxes_);
-    // compute every sha
-    compute_sha_buble(image, detections_);
-    // mark the original image with rectangle
-    mark_image(image, detections_);
-    detections_.clear();
-    confidences_.clear();
-    boxes_.clear();
-    return std::move(image);
+    for (int i = 0; i < constant::nimages; ++i) {
+      auto &image = images[i];
+      auto &output_tensor = output[i];
+
+      // detect the bubbles
+      detect(image, output_tensor, detections_, confidences_, boxes_);
+      // compute every sha
+      compute_sha_buble(image, detections_);
+      // mark the original image with rectangle
+      mark_image(image, detections_);
+      detections_.clear();
+      confidences_.clear();
+      boxes_.clear();
+    }
+    return std::move(images);
   }
 
   std::vector<const char *> cinput_name_;

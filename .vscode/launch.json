@@ -8,6 +8,7 @@
             "type": "lldb",
             "request": "launch",
             "name": "Debug",
+            "stopOnEntry": false,
             "program": "${workspaceFolder}/build/sandbox/exe",
             "args": [],
             "cwd": "${workspaceFolder}"

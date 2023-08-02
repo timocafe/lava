@@ -78,6 +78,9 @@
         "iterator": "cpp",
         "memory_resource": "cpp",
         "utility": "cpp",
-        "stop_token": "cpp"
+        "stop_token": "cpp",
+        "regex": "cpp",
+        "span": "cpp",
+        "unordered_set": "cpp"
     }
 }
