@@ -5,7 +5,7 @@ project(lava CXX)
 configure_file("${PROJECT_SOURCE_DIR}/lava/utils/path.h.in"
                "${PROJECT_BINARY_DIR}/lava/path.h")
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 
 include_directories(${PROJECT_SOURCE_DIR} ${PROJECT_BINARY_DIR})
 

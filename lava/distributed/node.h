@@ -128,6 +128,14 @@ struct generator {
   cv::VideoCapture cap_;
 };
 
+void write(cv::Mat &image, const std::string &sha, cv::Point text_position) {
+  int font_size = 1;                    // Declaring the font size
+  cv::Scalar font_Color(255, 255, 255); // Declaring the color of the font
+  int font_weight = 2;                  // Declaring the font weight
+  cv::putText(image, sha, text_position, cv::FONT_HERSHEY_COMPLEX, font_size,
+              font_Color, font_weight);
+}
+
 struct chat {
   chat(
       const std::shared_ptr<oneapi::tbb::concurrent_bounded_queue<cv::Mat>> &q =
@@ -142,13 +150,10 @@ struct chat {
     //  write_text(frame, sha);
     q_->try_push(frame);
   }
+
   void write_text(cv::Mat &image, const std::string &sha) {
-    cv::Point text_position(200, 80);     // Declaring the text position
-    int font_size = 1;                    // Declaring the font size
-    cv::Scalar font_Color(255, 255, 255); // Declaring the color of the font
-    int font_weight = 2;                  // Declaring the font weight
-    cv::putText(image, sha, text_position, cv::FONT_HERSHEY_COMPLEX, font_size,
-                font_Color, font_weight);
+    cv::Point text_position(200, 80); // Declaring the text position
+    write(image, sha, text_position);
   }
 
   std::shared_ptr<oneapi::tbb::concurrent_bounded_queue<cv::Mat>> q_;
