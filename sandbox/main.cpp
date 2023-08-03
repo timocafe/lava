@@ -35,7 +35,7 @@ int main(int, char **) {
   auto q = std::make_shared<oneapi::tbb::concurrent_bounded_queue<cv::Mat>>(
       oneapi::tbb::concurrent_bounded_queue<cv::Mat>());
 
-  std::string name("model_batch.onnx");
+  std::string name("model_colab.onnx");
   const auto &model = lava::helper_build_path::model_path() + name;
   lava::lavadom l(model, q);
   auto pipelineRunner = std::thread(std::ref(l));
@@ -43,19 +43,19 @@ int main(int, char **) {
   cv::Mat image;
   cv::Point text_position(200, 80);
   for (; !done;) {
+    //  auto start = std::chrono::high_resolution_clock::now();
     if (q->try_pop(image)) {
-      auto start = std::chrono::high_resolution_clock::now();
       char c = (char)cv::waitKey(1);
       if (c == 27 || c == 'q' || c == 'Q') {
         done = true;
       }
-      auto end = std::chrono::high_resolution_clock::now() - start;
-      float microseconds =
-          std::chrono::duration_cast<std::chrono::microseconds>(end).count();
-      float fps = 100000. / microseconds;
-      std::stringstream stream;
-      stream << std::fixed << std::setprecision(2) << fps;
-      lava::write(image, stream.str() + " fps", text_position);
+      // auto end = std::chrono::high_resolution_clock::now() - start;
+      // float microseconds =
+      //     std::chrono::duration_cast<std::chrono::microseconds>(end).count();
+      // float fps = 100000. / microseconds;
+      // std::stringstream stream;
+      // stream << std::fixed << std::setprecision(2) << fps;
+      // lava::write(image, stream.str() + " fps", text_position);
       cv::imshow("result", image);
     }
   }

@@ -34,7 +34,8 @@
 // OPenCV
 #include <opencv2/opencv.hpp>
 // ONNX
-#include <onnxruntime_cxx_api.h>
+#include <core/session/coreml_provider_factory.h>
+#include <core/session/onnxruntime_cxx_api.h>
 // TBB
 #include "oneapi/tbb/blocked_range.h"
 #include "oneapi/tbb/concurrent_queue.h"
@@ -45,7 +46,7 @@
 namespace lava {
 
 struct constant {
-  const static int nimages = 30;
+  const static int nimages = 1;
   const static int model_width = 640;
   const static int model_high = 640;
 };
@@ -94,8 +95,8 @@ struct helper_onnx {
     session_options_.SetInterOpNumThreads(threads);
     session_options_.SetGraphOptimizationLevel(
         GraphOptimizationLevel::ORT_ENABLE_EXTENDED);
-    // Ort::ThrowOnError(OrtSessionOptionsAppendExecutionProvider_CoreML(
-    //     session_options_, coreml_flags));
+    Ort::ThrowOnError(OrtSessionOptionsAppendExecutionProvider_CoreML(
+        session_options_, coreml_flags));
     env_ = Ort::Env(ORT_LOGGING_LEVEL_WARNING, "tutu");
     session_ = Ort::Session(env_, model.c_str(), session_options_);
     input_name_ = get_input_name(session_);
@@ -123,8 +124,8 @@ struct generator {
 
   std::vector<cv::Mat> operator()(tbb::flow_control &fc) {
     std::vector<cv::Mat> v(constant::nimages);
-    cv::Mat frame;
     for (int i = 0; i < constant::nimages; ++i) {
+      cv::Mat frame;
       if (cap_.read(frame)) {
         v[i] = frame;
       } else {
@@ -155,8 +156,9 @@ struct chat {
     //                                                image.end<uint8_t>());
     //  write big chat
     //   write_text(frame, sha);
-    for (auto &image : images)
+    for (auto &image : images) {
       q_->try_push(image);
+    }
   }
 
   void write_text(cv::Mat &image, const std::string &sha) {
@@ -297,9 +299,9 @@ struct ml {
                               &input_tensor, cinput_name_.size(),
                               coutput_name_.data(), coutput_name_.size());
 
+    auto &output_tensor = output[0];
     for (int i = 0; i < constant::nimages; ++i) {
       auto &image = images[i];
-      auto &output_tensor = output[i];
 
       // detect the bubbles
       detect(image, output_tensor, detections_, confidences_, boxes_, i);
