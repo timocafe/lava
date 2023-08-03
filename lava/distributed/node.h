@@ -186,7 +186,7 @@ struct Detection {
 
 void detect(const cv::Mat &input_image, Ort::Value &output_tensor,
             std::vector<Detection> &output, std::vector<float> &confidences,
-            std::vector<cv::Rect> &boxes) {
+            std::vector<cv::Rect> &boxes, int i) {
   // model trains with 640,640 inputs
   float x_factor = input_image.cols / 640.;
   float y_factor = input_image.rows / 640.;
@@ -197,8 +197,8 @@ void detect(const cv::Mat &input_image, Ort::Value &output_tensor,
   size_t count = output_tensor.GetTensorTypeAndShapeInfo().GetElementCount();
   // OpenCV is a pain with coordinates which are != from usual (x,y) orthogonal
   // basis
-  cv::Mat l_Mat =
-      cv::Mat(outputShape[1], outputShape[2], CV_32FC1, (void *)data);
+  cv::Mat l_Mat = cv::Mat(outputShape[1], outputShape[2], CV_32FC1,
+                          (void *)(data + i * outputShape[1] * outputShape[2]));
   cv::Mat l_Mat_t = l_Mat.t();
   // first 5 elements are box[4] and obj confidence
   int numClasses = l_Mat_t.cols - 4;
@@ -302,7 +302,7 @@ struct ml {
       auto &output_tensor = output[i];
 
       // detect the bubbles
-      detect(image, output_tensor, detections_, confidences_, boxes_);
+      detect(image, output_tensor, detections_, confidences_, boxes_, i);
       // compute every sha
       compute_sha_buble(image, detections_);
       // mark the original image with rectangle
