@@ -36,10 +36,14 @@ struct lavadom {
 
   explicit lavadom(
       const std::string &model = "lava.onnx",
-      std::shared_ptr<oneapi::tbb::concurrent_bounded_queue<cv::Mat>> q =
-          std::shared_ptr<oneapi::tbb::concurrent_bounded_queue<cv::Mat>>(),
-      std::shared_ptr<oneapi::tbb::concurrent_queue<cv::Mat>> qm =
-          std::shared_ptr<oneapi::tbb::concurrent_queue<cv::Mat>>())
+      std::shared_ptr<oneapi::tbb::concurrent_bounded_queue<
+          std::pair<cv::Mat, chrono_type>>>
+          q = std::shared_ptr<oneapi::tbb::concurrent_bounded_queue<
+              std::pair<cv::Mat, chrono_type>>>(),
+      std::shared_ptr<
+          oneapi::tbb::concurrent_queue<std::pair<cv::Mat, chrono_type>>>
+          qm = std::shared_ptr<
+              oneapi::tbb::concurrent_queue<std::pair<cv::Mat, chrono_type>>>())
       : ml_(ml(model)), chat_(q){};
 
   // functor for the pipeline
@@ -48,19 +52,22 @@ struct lavadom {
       oneapi::tbb::parallel_pipeline(
           ntokens_,
           // get the images from the camera
-          oneapi::tbb::make_filter<void, cv::Mat>(
+          oneapi::tbb::make_filter<void, std::pair<cv::Mat, chrono_type>>(
               oneapi::tbb::filter_mode::serial_in_order,
-              [&](oneapi::tbb::flow_control &fc) -> cv::Mat {
+              [&](oneapi::tbb::flow_control &fc)
+                  -> std::pair<cv::Mat, chrono_type> {
                 return generator_(fc);
               }) &
               // perform ML model
-              oneapi::tbb::make_filter<cv::Mat, cv::Mat>(
+              oneapi::tbb::make_filter<std::pair<cv::Mat, chrono_type>,
+                                       std::pair<cv::Mat, chrono_type>>(
                   oneapi::tbb::filter_mode::serial_in_order,
-                  [&](const cv::Mat &m) -> cv::Mat { return ml_(m); }) &
+                  [&](const std::pair<cv::Mat, chrono_type> &m)
+                      -> std::pair<cv::Mat, chrono_type> { return ml_(m); }) &
               // show image with the randomnumber
-              oneapi::tbb::make_filter<cv::Mat, void>(
+              oneapi::tbb::make_filter<std::pair<cv::Mat, chrono_type>, void>(
                   oneapi::tbb::filter_mode::serial_in_order,
-                  [&](const cv::Mat &m) { chat_(m); }));
+                  [&](const std::pair<cv::Mat, chrono_type> &m) { chat_(m); }));
     } catch (std::out_of_range &e) {
       std::cerr << "ERROR: somthing else" << std::endl;
       throw e;

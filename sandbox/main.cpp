@@ -32,19 +32,24 @@ volatile bool done = false; // volatile is enough here. We don't need a mutex
 
 int main(int, char **) {
 
-  auto q = std::make_shared<oneapi::tbb::concurrent_bounded_queue<cv::Mat>>(
-      oneapi::tbb::concurrent_bounded_queue<cv::Mat>());
+  auto q = std::make_shared<oneapi::tbb::concurrent_bounded_queue<
+      std::pair<cv::Mat, lava::chrono_type>>>(
+      oneapi::tbb::concurrent_bounded_queue<
+          std::pair<cv::Mat, lava::chrono_type>>());
 
   std::string name("model_colab.onnx");
   const auto &model = lava::helper_build_path::model_path() + name;
   lava::lavadom l(model, q);
   auto pipelineRunner = std::thread(std::ref(l));
 
+  std::pair<cv::Mat, lava::chrono_type> p;
   cv::Mat image;
   cv::Point text_position(200, 80);
   for (; !done;) {
-    if (q->try_pop(image)) {
-      auto start = std::chrono::high_resolution_clock::now();
+    auto start = std::chrono::high_resolution_clock::now();
+    if (q->try_pop(p)) {
+      image = p.first;
+      auto start = p.second;
       char c = (char)cv::waitKey(1);
       if (c == 27 || c == 'q' || c == 'Q') {
         done = true;
@@ -52,7 +57,7 @@ int main(int, char **) {
       auto end = std::chrono::high_resolution_clock::now() - start;
       float microseconds =
           std::chrono::duration_cast<std::chrono::microseconds>(end).count();
-      float fps = 100000. / microseconds;
+      float fps = 1000000. / microseconds;
       std::stringstream stream;
       stream << std::fixed << std::setprecision(2) << fps;
       lava::write(image, stream.str() + " fps", text_position);

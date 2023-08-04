@@ -34,7 +34,8 @@
 // OPenCV
 #include <opencv2/opencv.hpp>
 // ONNX
-#include <onnxruntime_cxx_api.h>
+#include <core/session/coreml_provider_factory.h>
+#include <core/session/onnxruntime_cxx_api.h>
 // TBB
 #include "oneapi/tbb/blocked_range.h"
 #include "oneapi/tbb/concurrent_queue.h"
@@ -43,6 +44,8 @@
 #include "lava/sha256/sha256.h"
 
 namespace lava {
+
+using chrono_type = std::chrono::time_point<std::chrono::high_resolution_clock>;
 
 std::vector<std::string> get_input_name(const Ort::Session &session) {
   Ort::AllocatorWithDefaultOptions allocator;
@@ -88,8 +91,8 @@ struct helper_onnx {
     session_options_.SetInterOpNumThreads(threads);
     session_options_.SetGraphOptimizationLevel(
         GraphOptimizationLevel::ORT_ENABLE_EXTENDED);
-    // Ort::ThrowOnError(OrtSessionOptionsAppendExecutionProvider_CoreML(
-    //     session_options_, coreml_flags));
+    Ort::ThrowOnError(OrtSessionOptionsAppendExecutionProvider_CoreML(
+        session_options_, coreml_flags));
     env_ = Ort::Env(ORT_LOGGING_LEVEL_WARNING, "tutu");
     session_ = Ort::Session(env_, model.c_str(), session_options_);
     input_name_ = get_input_name(session_);
@@ -115,13 +118,15 @@ struct generator {
       throw std::runtime_error("Error! Unable to open camera.\n");
   }
 
-  cv::Mat operator()(tbb::flow_control &fc) {
+  std::pair<cv::Mat, chrono_type> operator()(tbb::flow_control &fc) {
     cv::Mat frame;
     if (cap_.read(frame)) {
-      return std::move(frame);
+      return std::move(
+          std::make_pair(frame, std::chrono::high_resolution_clock::now()));
     } else {
       fc.stop();
-      return cv::Mat();
+      return std::make_pair(cv::Mat(),
+                            std::chrono::high_resolution_clock::now());
     }
   }
 
@@ -137,18 +142,20 @@ void write(cv::Mat &image, const std::string &sha, cv::Point text_position) {
 }
 
 struct chat {
-  chat(
-      const std::shared_ptr<oneapi::tbb::concurrent_bounded_queue<cv::Mat>> &q =
-          std::shared_ptr<oneapi::tbb::concurrent_bounded_queue<cv::Mat>>())
+  chat(const std::shared_ptr<oneapi::tbb::concurrent_bounded_queue<
+           std::pair<cv::Mat, chrono_type>>> &q =
+           std::shared_ptr<oneapi::tbb::concurrent_bounded_queue<
+               std::pair<cv::Mat, chrono_type>>>())
       : q_(q) {}
-  void operator()(const cv::Mat &image) {
-    std::string sha = picosha2::hash256_hex_string(image.begin<uint8_t>(),
-                                                   image.end<uint8_t>());
-    cv::Mat frame;
-    frame = image;
-    // write big chat
-    //  write_text(frame, sha);
-    q_->try_push(frame);
+  void operator()(const std::pair<cv::Mat, chrono_type> &p) {
+
+    // std::string sha = picosha2::hash256_hex_string(image.begin<uint8_t>(),
+    //                                                image.end<uint8_t>());
+    // cv::Mat frame;
+    // frame = image;
+    // // write big chat
+    // write_text(frame, sha);
+    q_->try_push(p);
   }
 
   void write_text(cv::Mat &image, const std::string &sha) {
@@ -156,7 +163,9 @@ struct chat {
     write(image, sha, text_position);
   }
 
-  std::shared_ptr<oneapi::tbb::concurrent_bounded_queue<cv::Mat>> q_;
+  std::shared_ptr<
+      oneapi::tbb::concurrent_bounded_queue<std::pair<cv::Mat, chrono_type>>>
+      q_;
 };
 
 cv::Mat make_input_image(const cv::Mat &image) {
@@ -265,7 +274,11 @@ struct ml {
     boxes_.reserve(32);
   }
 
-  cv::Mat operator()(const cv::Mat &image) {
+  std::pair<cv::Mat, chrono_type>
+  operator()(const std::pair<cv::Mat, chrono_type> &p) {
+    const auto &image = p.first; // image is a cv::Mat
+    const auto &time = p.second; // time is a std::chrono::time_point
+
     auto &memory_info = ho_.memory_info_;
     auto &session = ho_.session_;
     cinput_name_ = cnames(ho_.input_name_);
@@ -298,7 +311,7 @@ struct ml {
     detections_.clear();
     confidences_.clear();
     boxes_.clear();
-    return std::move(image);
+    return std::move(std::make_pair(image, time));
   }
 
   std::vector<const char *> cinput_name_;
