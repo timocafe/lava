@@ -46,7 +46,6 @@ int main(int, char **) {
   cv::Mat image;
   cv::Point text_position(200, 80);
   for (; !done;) {
-    auto start = std::chrono::high_resolution_clock::now();
     if (q->try_pop(p)) {
       image = p.first;
       auto start = p.second;
@@ -61,7 +60,7 @@ int main(int, char **) {
       std::stringstream stream;
       stream << std::fixed << std::setprecision(2) << fps;
       lava::write(image, stream.str() + " fps", text_position);
-      cv::imshow("result", image);
+      cv::imshow("LavaRandom", image);
     }
   }
   pipelineRunner.join();
