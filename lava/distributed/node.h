@@ -169,9 +169,7 @@ struct chat {
 };
 
 cv::Mat make_input_image(const cv::Mat &image) {
-  auto nimage = image.clone();
-  cv::resize(nimage, nimage, cv::Size(640, 640));
-  return cv::dnn::blobFromImage(nimage, 1. / 255, cv::Size(640, 640),
+  return cv::dnn::blobFromImage(image, 1. / 255, cv::Size(640, 640),
                                 cv::Scalar(), true, false);
 }
 
@@ -185,8 +183,8 @@ void detect(const cv::Mat &input_image, Ort::Value &output_tensor,
             std::vector<Detection> &output, std::vector<float> &confidences,
             std::vector<cv::Rect> &boxes) {
   // model trains with 640,640 inputs
-  float x_factor = input_image.cols / 640.;
-  float y_factor = input_image.rows / 640.;
+  const float x_factor = input_image.cols / 640.;
+  const float y_factor = input_image.rows / 640.;
 
   float *data = output_tensor.GetTensorMutableData<float>();
   std::vector<int64_t> outputShape =

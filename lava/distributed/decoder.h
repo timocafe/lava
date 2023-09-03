@@ -74,7 +74,7 @@ struct lavadom {
     }
   }
 
-  std::size_t ntokens_ = {2}; // number of tokens available
+  const std::size_t ntokens_ = {4}; // number of tokens available
   generator generator_;
   ml ml_;
   chat chat_;
