@@ -222,8 +222,8 @@ private:
     switch (provider) {
     case ExecutionProvider::COREML:
       try {
-        Ort::ThrowOnError(OrtSessionOptionsAppendExecutionProvider_CoreML(
-            session_options_, 0));
+        //      Ort::ThrowOnError(OrtSessionOptionsAppendExecutionProvider_CoreML(
+        //          session_options_, 0));
         std::cout << "Using CoreML execution provider (GPU acceleration)"
                   << std::endl;
       } catch (const std::exception &e) {
@@ -247,8 +247,8 @@ private:
     default:
       // Try CoreML first, fallback to CPU
       try {
-        Ort::ThrowOnError(OrtSessionOptionsAppendExecutionProvider_CoreML(
-            session_options_, 0));
+        //      Ort::ThrowOnError(OrtSessionOptionsAppendExecutionProvider_CoreML(
+        //          session_options_, 0));
         std::cout << "Using CoreML execution provider (GPU acceleration)"
                   << std::endl;
       } catch (const std::exception &e) {
@@ -396,8 +396,11 @@ void compute_detection_hashes(const cv::Mat &image,
 
             cv::Mat sub_image = image(cv::Range(box.y, box.y + box.height),
                                       cv::Range(box.x, box.x + box.width));
-            std::string sha = picosha2::hash256_hex_string(
-                sub_image.begin<uint8_t>(), sub_image.end<uint8_t>());
+
+            const uint8_t *data = sub_image.ptr<uint8_t>(0);
+            size_t total_bytes = sub_image.total() * sub_image.elemSize();
+            std::string sha =
+                picosha2::hash256_hex_string(data, data + total_bytes);
             detection.sha_ =
                 sha.substr(1, 8); // Take first 8 chars after prefix
           }
@@ -486,7 +489,7 @@ class MLProcessor {
 public:
   explicit MLProcessor(const std::string &model_path = std::string(),
                        std::size_t threads = 1,
-                       ExecutionProvider provider = ExecutionProvider::AUTO)
+                       ExecutionProvider provider = ExecutionProvider::CPU)
       : model_path_(model_path), onnx_session_(model_path, threads, provider),
         threads_(threads) {
 

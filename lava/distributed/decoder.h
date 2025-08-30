@@ -44,7 +44,7 @@ struct lavadom {
           oneapi::tbb::concurrent_queue<std::pair<cv::Mat, chrono_type>>>
           qm = std::shared_ptr<
               oneapi::tbb::concurrent_queue<std::pair<cv::Mat, chrono_type>>>())
-      : ml_(ml(model)), chat_(q){};
+      : ml_(ml(model)), chat_(q) {};
 
   // functor for the pipeline
   void operator()() {
