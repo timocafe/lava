@@ -1,4 +1,4 @@
-cmake_minimum_required (VERSION 3.8)
+cmake_minimum_required (VERSION 3.10)
 
 project(lava CXX)
 
@@ -10,17 +10,12 @@ set(CMAKE_CXX_STANDARD 20)
 include_directories(${PROJECT_SOURCE_DIR} ${PROJECT_BINARY_DIR})
 
 find_package(PkgConfig REQUIRED)
-
 find_package(Threads REQUIRED)
 
 pkg_check_modules(opencv REQUIRED IMPORTED_TARGET opencv4)
 pkg_check_modules(onnxruntime REQUIRED IMPORTED_TARGET libonnxruntime)
 pkg_check_modules(tbb REQUIRED IMPORTED_TARGET tbb)
 
-add_subdirectory(sandbox)
-
-# Locate GTest
-#enable_testing()
-#add_subdirectory(test)
-
+ADD_EXECUTABLE(exe main.cpp lava/app/application.cpp ${SRC_FILES})
+target_link_libraries(exe PUBLIC   ${EXTRA_LIBS} PkgConfig::tbb PkgConfig::opencv PkgConfig::onnxruntime Threads::Threads)
 
