@@ -159,7 +159,6 @@ void Application::processFrame(
   const char key = static_cast<char>(cv::waitKey(1));
   if (key == 27 || key == 'q' || key == 'Q') {
     done_ = true;
-    pipeline_should_stop.store(true);
     return;
   }
 
@@ -196,6 +195,7 @@ void Application::displayControls() const {
 }
 
 void Application::shutdown() {
+  // needed to avoid race condition
   pipeline_should_stop.store(true);
   pipeline_thread_.join();
 }
