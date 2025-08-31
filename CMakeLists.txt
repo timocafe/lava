@@ -1,4 +1,4 @@
-cmake_minimum_required (VERSION 3.8)
+cmake_minimum_required (VERSION 3.10)
 
 project(lava CXX)
 
@@ -15,8 +15,7 @@ find_package(Threads REQUIRED)
 pkg_check_modules(opencv REQUIRED IMPORTED_TARGET opencv4)
 pkg_check_modules(onnxruntime REQUIRED IMPORTED_TARGET libonnxruntime)
 pkg_check_modules(tbb REQUIRED IMPORTED_TARGET tbb)
-pkg_check_modules(glfw3 REQUIRED IMPORTED_TARGET glfw3)
 
-ADD_EXECUTABLE(exe main.cpp ${SRC_FILES})
+ADD_EXECUTABLE(exe main.cpp lava/app/application.cpp ${SRC_FILES})
 target_link_libraries(exe PUBLIC   ${EXTRA_LIBS} PkgConfig::tbb PkgConfig::opencv PkgConfig::onnxruntime Threads::Threads)
 

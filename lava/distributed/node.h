@@ -53,6 +53,9 @@
 
 namespace lava {
 
+// Forward declaration for shutdown coordination
+extern std::atomic<bool> pipeline_should_stop;
+
 // ============================================================================
 // TYPE ALIASES AND CONSTANTS
 // ============================================================================
@@ -82,7 +85,7 @@ struct Detection {
 /**
  * @brief Extract input names from ONNX session
  */
-std::vector<std::string> get_input_names(const Ort::Session &session) {
+inline std::vector<std::string> get_input_names(const Ort::Session &session) {
   Ort::AllocatorWithDefaultOptions allocator;
   const std::size_t input_count = session.GetInputCount();
   std::vector<std::string> input_names(input_count);
@@ -97,7 +100,7 @@ std::vector<std::string> get_input_names(const Ort::Session &session) {
 /**
  * @brief Extract output names from ONNX session
  */
-std::vector<std::string> get_output_names(const Ort::Session &session) {
+inline std::vector<std::string> get_output_names(const Ort::Session &session) {
   Ort::AllocatorWithDefaultOptions allocator;
   const std::size_t output_count = session.GetOutputCount();
   std::vector<std::string> output_names(output_count);
@@ -112,7 +115,8 @@ std::vector<std::string> get_output_names(const Ort::Session &session) {
 /**
  * @brief Convert string vector to C-style string array
  */
-std::vector<const char *> to_c_strings(const std::vector<std::string> &names) {
+inline std::vector<const char *>
+to_c_strings(const std::vector<std::string> &names) {
   std::vector<const char *> c_names(names.size());
   std::transform(names.begin(), names.end(), c_names.begin(),
                  [](const std::string &s) { return s.c_str(); });
@@ -122,7 +126,8 @@ std::vector<const char *> to_c_strings(const std::vector<std::string> &names) {
 /**
  * @brief Calculate total size from tensor shape
  */
-constexpr int64_t calculate_tensor_size(const std::vector<int64_t> &shape) {
+inline constexpr int64_t
+calculate_tensor_size(const std::vector<int64_t> &shape) {
   return std::accumulate(shape.begin(), shape.end(), int64_t{1},
                          std::multiplies<int64_t>{});
 }
@@ -130,7 +135,7 @@ constexpr int64_t calculate_tensor_size(const std::vector<int64_t> &shape) {
 /**
  * @brief Create preprocessed input image for ONNX model
  */
-cv::Mat create_model_input(const cv::Mat &image) {
+inline cv::Mat create_model_input(const cv::Mat &image) {
   const cv::Size MODEL_INPUT_SIZE{640, 640};
   constexpr double NORMALIZATION_FACTOR = 1.0 / 255.0;
 
@@ -145,13 +150,13 @@ cv::Mat create_model_input(const cv::Mat &image) {
 /**
  * @brief Mock CoreML provider that always fails for testing fallback mechanism
  */
-// OrtStatus *
-// OrtSessionOptionsAppendExecutionProvider_CoreML(OrtSessionOptions *options,
-//                                                 uint32_t coreml_flags) {
-//   // Simulate CoreML provider failure - throw exception that will be caught
-//   throw Ort::Exception(
-//       "Mock CoreML provider: CoreML not available on this system", ORT_FAIL);
-// }
+inline OrtStatus *
+OrtSessionOptionsAppendExecutionProvider_CoreML(OrtSessionOptions *options,
+                                                uint32_t coreml_flags) {
+  // Simulate CoreML provider failure - throw exception that will be caught
+  throw Ort::Exception(
+      "Mock CoreML provider: CoreML not available on this system", ORT_FAIL);
+}
 
 // ============================================================================
 // ONNX SESSION MANAGEMENT
@@ -222,8 +227,8 @@ private:
     switch (provider) {
     case ExecutionProvider::COREML:
       try {
-        //      Ort::ThrowOnError(OrtSessionOptionsAppendExecutionProvider_CoreML(
-        //          session_options_, 0));
+        Ort::ThrowOnError(OrtSessionOptionsAppendExecutionProvider_CoreML(
+            session_options_, 0));
         std::cout << "Using CoreML execution provider (GPU acceleration)"
                   << std::endl;
       } catch (const std::exception &e) {
@@ -247,8 +252,8 @@ private:
     default:
       // Try CoreML first, fallback to CPU
       try {
-        //      Ort::ThrowOnError(OrtSessionOptionsAppendExecutionProvider_CoreML(
-        //          session_options_, 0));
+        Ort::ThrowOnError(OrtSessionOptionsAppendExecutionProvider_CoreML(
+            session_options_, 0));
         std::cout << "Using CoreML execution provider (GPU acceleration)"
                   << std::endl;
       } catch (const std::exception &e) {
@@ -291,19 +296,21 @@ public:
   }
 
   std::pair<cv::Mat, chrono_type> operator()(tbb::flow_control &fc) {
-    cv::Mat frame;
-    if (cap_.read(frame)) {
-      return std::make_pair(std::move(frame),
-                            std::chrono::high_resolution_clock::now());
-    } else {
+    // Check shutdown signal or camera failure - both stop the pipeline
+    if (pipeline_should_stop.load() || !cap_.read(frame_)) {
       fc.stop();
       return std::make_pair(cv::Mat(),
                             std::chrono::high_resolution_clock::now());
     }
+
+    // Return captured frame with timestamp
+    return std::make_pair(std::move(frame_),
+                          std::chrono::high_resolution_clock::now());
   }
 
 private:
   cv::VideoCapture cap_;
+  cv::Mat frame_; // Reusable frame buffer
 };
 
 // ============================================================================
@@ -313,9 +320,10 @@ private:
 /**
  * @brief Perform object detection post-processing with NMS
  */
-void detect(const cv::Mat &input_image, Ort::Value &output_tensor,
-            std::vector<Detection> &output, std::vector<float> &confidences,
-            std::vector<cv::Rect> &boxes) {
+inline void detect(const cv::Mat &input_image, Ort::Value &output_tensor,
+                   std::vector<Detection> &output,
+                   std::vector<float> &confidences,
+                   std::vector<cv::Rect> &boxes) {
 
   // Clear previous results
   output.clear();
@@ -381,8 +389,8 @@ void detect(const cv::Mat &input_image, Ort::Value &output_tensor,
 /**
  * @brief Compute SHA256 hash for detected regions in parallel
  */
-void compute_detection_hashes(const cv::Mat &image,
-                              std::vector<Detection> &detections) {
+inline void compute_detection_hashes(const cv::Mat &image,
+                                     std::vector<Detection> &detections) {
   tbb::parallel_for(
       tbb::blocked_range<int>(0, static_cast<int>(detections.size())),
       [&](const tbb::blocked_range<int> &range) {
@@ -411,7 +419,8 @@ void compute_detection_hashes(const cv::Mat &image,
 /**
  * @brief Draw detection results on image
  */
-void draw_detections(cv::Mat &image, const std::vector<Detection> &detections) {
+inline void draw_detections(cv::Mat &image,
+                            const std::vector<Detection> &detections) {
   const cv::Scalar BOX_COLOR(187, 114, 0); // French blue (BGR)
   const cv::Scalar TEXT_COLOR(0, 0, 0);    // Black text
   constexpr int BOX_THICKNESS = 3;
@@ -441,8 +450,8 @@ void draw_detections(cv::Mat &image, const std::vector<Detection> &detections) {
 /**
  * @brief Text overlay utility
  */
-void write_text_overlay(cv::Mat &image, const std::string &text,
-                        cv::Point position) {
+inline void write_text_overlay(cv::Mat &image, const std::string &text,
+                               cv::Point position) {
   constexpr int FONT_SIZE = 1;
   const cv::Scalar FONT_COLOR(255, 255, 255); // White
   constexpr int FONT_WEIGHT = 2;
@@ -488,8 +497,8 @@ private:
 class MLProcessor {
 public:
   explicit MLProcessor(const std::string &model_path = std::string(),
-                       std::size_t threads = 1,
-                       ExecutionProvider provider = ExecutionProvider::CPU)
+                       ExecutionProvider provider = ExecutionProvider::CPU,
+                       std::size_t threads = 1)
       : model_path_(model_path), onnx_session_(model_path, threads, provider),
         threads_(threads) {
 
@@ -501,6 +510,12 @@ public:
     // Cache the C-style name arrays once during construction
     input_name_ptrs_ = to_c_strings(onnx_session_.input_name_);
     output_name_ptrs_ = to_c_strings(onnx_session_.output_name_);
+
+    // Cache tensor shape information to avoid repeated queries
+    cached_input_shape_ = onnx_session_.session_.GetInputTypeInfo(0)
+                              .GetTensorTypeAndShapeInfo()
+                              .GetShape();
+    cached_input_size_ = calculate_tensor_size(cached_input_shape_);
   }
 
   std::pair<cv::Mat, chrono_type>
@@ -516,10 +531,8 @@ public:
     auto &memory_info = onnx_session_.memory_info_;
     auto &session = onnx_session_.session_;
 
-    // Get tensor shape information (lightweight operation)
-    const auto input_shape =
-        session.GetInputTypeInfo(0).GetTensorTypeAndShapeInfo().GetShape();
-    const auto input_size = calculate_tensor_size(input_shape);
+    // Use cached tensor shape to avoid repeated type info queries
+    const auto input_size = cached_input_size_;
 
     // Preprocess the image
     const auto processed_image = create_model_input(image);
@@ -529,7 +542,7 @@ public:
         memory_info,
         const_cast<float *>(
             reinterpret_cast<const float *>(processed_image.data)),
-        input_size, input_shape.data(), input_shape.size());
+        input_size, cached_input_shape_.data(), cached_input_shape_.size());
 
     // Run inference using cached name arrays
     auto outputs =
@@ -563,6 +576,10 @@ private:
   // Cached C-style name arrays (computed once in constructor)
   std::vector<const char *> input_name_ptrs_;
   std::vector<const char *> output_name_ptrs_;
+
+  // Cached tensor shape information (computed once in constructor)
+  std::vector<int64_t> cached_input_shape_;
+  int64_t cached_input_size_;
 
   // Working buffers (reused across calls)
   std::vector<float> confidences_;

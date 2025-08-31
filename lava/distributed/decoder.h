@@ -23,6 +23,7 @@
 
 #pragma once
 
+#include <atomic>
 #include <opencv2/opencv.hpp>
 
 #include <oneapi/tbb/concurrent_queue.h>
@@ -32,10 +33,14 @@
 
 namespace lava {
 
+// Global shutdown flag for pipeline coordination
+inline std::atomic<bool> pipeline_should_stop{false};
+
 struct lavadom {
 
   explicit lavadom(
       const std::string &model = "lava.onnx",
+      const ExecutionProvider provider = ExecutionProvider::CPU,
       std::shared_ptr<oneapi::tbb::concurrent_bounded_queue<
           std::pair<cv::Mat, chrono_type>>>
           q = std::shared_ptr<oneapi::tbb::concurrent_bounded_queue<
@@ -44,7 +49,7 @@ struct lavadom {
           oneapi::tbb::concurrent_queue<std::pair<cv::Mat, chrono_type>>>
           qm = std::shared_ptr<
               oneapi::tbb::concurrent_queue<std::pair<cv::Mat, chrono_type>>>())
-      : ml_(ml(model)), chat_(q) {};
+      : ml_(ml(model, provider)), chat_(q) {};
 
   // functor for the pipeline
   void operator()() {

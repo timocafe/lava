@@ -21,48 +21,9 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include <chrono>
-#include <sstream>
-#include <thread>
-
-#include "lava/lava.h"
-
-volatile bool done = false; // volatile is enough here. We don't need a mutex
-                            // for this simple flag.
+#include "lava/app/application.h"
 
 int main(int, char **) {
-
-  auto q = std::make_shared<oneapi::tbb::concurrent_bounded_queue<
-      std::pair<cv::Mat, lava::chrono_type>>>(
-      oneapi::tbb::concurrent_bounded_queue<
-          std::pair<cv::Mat, lava::chrono_type>>());
-
-  std::string name("model_colab.onnx");
-  const auto &model = lava::helper_build_path::model_path() + name;
-  lava::lavadom l(model, q);
-  auto pipelineRunner = std::thread(std::ref(l));
-
-  std::pair<cv::Mat, lava::chrono_type> p;
-  cv::Mat image;
-  cv::Point text_position(200, 80);
-  for (; !done;) {
-    if (q->try_pop(p)) {
-      image = p.first;
-      auto start = p.second;
-      char c = (char)cv::waitKey(1);
-      if (c == 27 || c == 'q' || c == 'Q') {
-        done = true;
-      }
-      auto end = std::chrono::high_resolution_clock::now() - start;
-      float microseconds =
-          std::chrono::duration_cast<std::chrono::microseconds>(end).count();
-      float fps = 1000000. / microseconds;
-      std::stringstream stream;
-      stream << std::fixed << std::setprecision(2) << fps;
-      lava::write_text_overlay(image, stream.str() + " fps", text_position);
-      cv::imshow("LavaRandom", image);
-    }
-  }
-  pipelineRunner.join();
-  return 0;
+  lava::Application app;
+  return app.run();
 }
