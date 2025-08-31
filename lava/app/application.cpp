@@ -195,7 +195,9 @@ void Application::displayControls() const {
 }
 
 void Application::shutdown() {
-  // needed to avoid race condition
+  // Set the stop flag before joining to ensure the pipeline thread sees the signal and exits.
+  // This prevents a race condition where the main thread could join before the pipeline thread
+  // checks the flag, potentially causing deadlock or undefined behavior.
   pipeline_should_stop.store(true);
   pipeline_thread_.join();
 }
