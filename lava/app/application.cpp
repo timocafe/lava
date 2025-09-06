@@ -68,7 +68,8 @@ ExecutionProvider Application::selectExecutionProvider() {
   std::cout << "\n=== Execution Provider Selection ===" << std::endl;
   std::cout << "1. CPU (Default - Always available)" << std::endl;
   std::cout << "2. CoreML (Mac GPU acceleration)" << std::endl;
-  std::cout << "3. AUTO (Try CoreML, fallback to CPU)" << std::endl;
+  std::cout << "3. GPU (DirectML windows, fallback to CPU)" << std::endl;
+  std::cout << "4. AUTO (Try GPU,CoreML, fallback to CPU)" << std::endl;
   std::cout << "Select execution provider (1-3): ";
 
   int choice;
@@ -79,6 +80,9 @@ ExecutionProvider Application::selectExecutionProvider() {
     std::cout << "Selected: CoreML Provider" << std::endl;
     return ExecutionProvider::COREML;
   case 3:
+    std::cout << "Selected: DirectML Provider" << std::endl;
+    return ExecutionProvider::DIRECTML;
+  case 4:
     std::cout << "Selected: AUTO Provider (CoreML with CPU fallback)"
               << std::endl;
     return ExecutionProvider::AUTO;
@@ -95,6 +99,8 @@ std::string Application::getProviderName(ExecutionProvider provider) const {
     return "CPU";
   case ExecutionProvider::COREML:
     return "CoreML";
+  case ExecutionProvider::DIRECTML:
+    return "DirectML";
   case ExecutionProvider::AUTO:
     return "AUTO";
   default:
@@ -167,9 +173,9 @@ void Application::processFrame(
 
   // Calculate and display FPS
   const auto duration = std::chrono::high_resolution_clock::now() - start;
-  const float microseconds =
+  const auto microseconds =
       std::chrono::duration_cast<std::chrono::microseconds>(duration).count();
-  const float fps = 1e6f / microseconds;
+  const float fps = 1e6f / (float)microseconds;
 
   // Reuse stream buffer for performance
   fps_stream_.str("");

@@ -22,7 +22,7 @@
 // SOFTWARE.
 
 #include "lava/app/application.h"
-
+#include <iostream>
 int main(int, char **) {
   lava::Application app;
   return app.run();
