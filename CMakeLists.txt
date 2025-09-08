@@ -34,11 +34,15 @@ elseif(WIN32)
     find_package(TBB REQUIRED tbb)
     # ONNX Runtime (adjust PATHS to where you unpacked the SDK)
     set(ONNXRUNTIME_DIR "C:\\opt\\onnxruntime\\Microsoft.ML.OnnxRuntime.DirectML.1.22.1")
+    # OpenVINO
+    set(OPENVINO_DIR "C:\\opt\\openvino")
 
     # Includes
     include_directories( ${ONNXRUNTIME_DIR}/build/native/include)
+#   include_directories( ${OPENVINO_DIR}/include)
     # Link dirs (contains onnxruntime.lib and provider DLLs)
     link_directories(${ONNXRUNTIME_DIR}/runtimes/win-x64/native)
+#   link_directories(${OPENVINO_DIR}/lib)
 
     set(LAVA_DEPS
         ${OpenCV_LIBS}

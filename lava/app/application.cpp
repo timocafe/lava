@@ -69,8 +69,9 @@ ExecutionProvider Application::selectExecutionProvider() {
   std::cout << "1. CPU (Default - Always available)" << std::endl;
   std::cout << "2. CoreML (Mac GPU acceleration)" << std::endl;
   std::cout << "3. GPU (DirectML windows, fallback to CPU)" << std::endl;
-  std::cout << "4. AUTO (Try GPU,CoreML, fallback to CPU)" << std::endl;
-  std::cout << "Select execution provider (1-3): ";
+  std::cout << "4. CPU OpenVINO" << std::endl;
+  std::cout << "5. AUTO (Try GPU,CoreML, fallback to CPU)" << std::endl;
+  std::cout << "Select execution provider (1-4): ";
 
   int choice;
   std::cin >> choice;
@@ -83,9 +84,8 @@ ExecutionProvider Application::selectExecutionProvider() {
     std::cout << "Selected: DirectML Provider" << std::endl;
     return ExecutionProvider::DIRECTML;
   case 4:
-    std::cout << "Selected: AUTO Provider (CoreML with CPU fallback)"
-              << std::endl;
-    return ExecutionProvider::AUTO;
+    std::cout << "Selected: OpenVino Provider" << std::endl;
+    return ExecutionProvider::OPENVINO;
   case 1:
   default:
     std::cout << "Selected: CPU Provider" << std::endl;
@@ -101,6 +101,8 @@ std::string Application::getProviderName(ExecutionProvider provider) const {
     return "CoreML";
   case ExecutionProvider::DIRECTML:
     return "DirectML";
+  case ExecutionProvider::OPENVINO:
+    return "OpenVino";
   case ExecutionProvider::AUTO:
     return "AUTO";
   default:
@@ -109,7 +111,7 @@ std::string Application::getProviderName(ExecutionProvider provider) const {
 }
 
 void Application::handleProviderSwitch(char key) {
-  if (key != '1' && key != '2' && key != '3') {
+  if (key != '1' && key != '2' && key != '3' && key != '4' && key != '5') {
     return;
   }
 
@@ -122,6 +124,12 @@ void Application::handleProviderSwitch(char key) {
     newProvider = ExecutionProvider::COREML;
     break;
   case '3':
+    newProvider = ExecutionProvider::DIRECTML;
+    break;
+  case '4':
+    newProvider = ExecutionProvider::OPENVINO;
+    break;
+  case '5':
     newProvider = ExecutionProvider::AUTO;
     break;
   default:
@@ -197,7 +205,8 @@ void Application::displayControls() const {
   std::cout << "ESC/Q: Quit application" << std::endl;
   std::cout << "1: Switch to CPU provider" << std::endl;
   std::cout << "2: Switch to CoreML provider" << std::endl;
-  std::cout << "3: Switch to AUTO provider" << std::endl;
+  std::cout << "3: Switch to DML provider" << std::endl;
+  std::cout << "4: Switch to AUTO provider" << std::endl;
 }
 
 void Application::shutdown() {

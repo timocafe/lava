@@ -83,10 +83,11 @@ namespace lava
 
   enum class ExecutionProvider
   {
-    AUTO,    // Try CoreML first, fallback to CPU
-    COREML,  // Force CoreML (Mac GPU)
-    CPU,     // Force CPU
-    DIRECTML // Force DirectML (Windows GPU)
+    AUTO,     // Try CoreML first, fallback to CPU
+    COREML,   // Force CoreML (Mac GPU)
+    CPU,      // Force CPU
+    DIRECTML, // Force DirectML (Windows GPU)
+    OPENVINO  // Force OPENVINO
   };
 
   struct Detection
@@ -211,7 +212,7 @@ namespace lava
   {
   public:
     explicit ONNXSession(const std::string &model_path = std::string(),
-                         size_t threads = 4,
+                         size_t threads = 1,
                          ExecutionProvider provider = ExecutionProvider::AUTO)
     {
       if (model_path.empty())
@@ -244,29 +245,35 @@ namespace lava
     void initialize_session(const std::string &model_path, size_t threads,
                             ExecutionProvider provider)
     {
+      // get providers list
+      get_providers();
       // Create memory info
       memory_info_ = Ort::MemoryInfo::CreateCpu(
           OrtAllocatorType::OrtArenaAllocator, OrtMemType::OrtMemTypeDefault);
 
       // Initialize session options
       session_options_ = Ort::SessionOptions();
-      // get providers list
-      get_providers();
 
       // Configure threading (avoiding SetIntraOpNumThreads for better
       // performance)
-      session_options_.SetInterOpNumThreads(static_cast<int>(threads));
-      session_options_.SetGraphOptimizationLevel(
-          GraphOptimizationLevel::ORT_ENABLE_EXTENDED);
-
-      // Set execution provider based on user preference
-      setup_execution_provider(provider);
+      std::cout << " number of threads: " << threads << std::endl;
+      session_options_.SetInterOpNumThreads(static_cast<int>(1));
+      //    session_options_.SetGraphOptimizationLevel(
+      //        GraphOptimizationLevel::ORT_ENABLE_EXTENDED);
+      session_options_.SetGraphOptimizationLevel(ORT_DISABLE_ALL);
+      session_options_.SetExecutionMode(ExecutionMode::ORT_SEQUENTIAL);
+      session_options_.DisableMemPattern();
 
       // Create environment and session
       env_ = Ort::Env(ORT_LOGGING_LEVEL_WARNING, "LavaONNX");
-      //    session_ = Ort::Session(env_, model_path.c_str(), session_options_);
-      std::cout << "<------------------------0 \n";
+#ifdef _WIN32
+      std::copy(model_path.begin(), model_path.end(), std::ostream_iterator<char>(std::cout, ""));
       session_ = Ort::Session(env_, to_wpath(model_path).c_str(), session_options_);
+#else
+      session_ = Ort::Session(env_, model_path.c_str(), session_options_);
+#endif
+      // Set execution provider based on user preference
+      setup_execution_provider(provider);
     }
 
     void get_providers()
@@ -317,7 +324,6 @@ namespace lava
                                    std::string(e.what()));
         }
         break;
-
       case ExecutionProvider::CPU:
         try
         {
@@ -328,6 +334,29 @@ namespace lava
         catch (const std::exception &e)
         {
           throw std::runtime_error("Failed to set CPU execution provider: " +
+                                   std::string(e.what()));
+        }
+        break;
+
+      case ExecutionProvider::OPENVINO:
+        try
+        {
+          std::cout << "before Using OpenVINO execution provider" << std::endl;
+          std::unordered_map<std::string, std::string> options;
+          options["device_type"] = "CPU";
+          options["precision"] = "FP32";
+          options["num_of_threads"] = "8";
+          options["num_streams"] = "1";
+          options["enable_vpu_fast_compile"] = "0"; // required field
+          options["cache_dir"] = "";                // optional, must exist if not empty
+          options["enable_dynamic_shapes"] = "0";   // optional
+          options["enable_partial_shapes"] = "0";   // optional
+          session_options_.AppendExecutionProvider_OpenVINO_V2(options);
+          std::cout << "Using OpenVINO execution provider" << std::endl;
+        }
+        catch (const std::exception &e)
+        {
+          throw std::runtime_error("Failed to set OpenVINO execution provider: " +
                                    std::string(e.what()));
         }
         break;
