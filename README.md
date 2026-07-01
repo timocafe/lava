@@ -59,5 +59,5 @@ Note that ONNX is platform-agnostic, so regardless of your machine, you can sele
 
 ## Disclaimer
 
-I have not conducted a formal study on the efficiency of this generator, nor do I understand the influence of SHA256 on the randomness quality. Therefore, there is no guarantee whatsoever regarding the mathematical quality of the random numbers generated. 
+I have not conducted a formal study on the efficiency of this generator, nor do I understand the influence of SHA256 on the randomness quality. Therefore, there is no guarantee whatsoever regarding the mathematical quality of the random numbers generated.. 
 
